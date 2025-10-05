@@ -79,10 +79,40 @@ Frontend dev server will run on `http://localhost:5173` with proxy to backend at
 
 ## Usage
 
+### Web Interface
 1. Open your browser to `http://localhost:8080`
 2. Register a new account with a username and password
 3. Login with your credentials
 4. Start chatting in real-time!
+
+### Testing the API
+Run the included test script to verify all API endpoints:
+```bash
+./test_api.sh
+```
+
+Or test manually with curl:
+```bash
+# Register
+curl -X POST http://localhost:8080/api/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "alice", "password": "pass123"}'
+
+# Login
+curl -X POST http://localhost:8080/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "alice", "password": "pass123"}'
+
+# Send message (replace TOKEN with actual token from login)
+curl -X POST http://localhost:8080/api/messages/send \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{"message": "Hello, World!"}'
+
+# Get messages
+curl -X GET http://localhost:8080/api/messages \
+  -H "Authorization: Bearer TOKEN"
+```
 
 ## API Endpoints
 
