@@ -1,0 +1,16 @@
+{application, squidward_chat,
+ [{description, "A minimal barebones instant chat messenger"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, {squidward_chat_app, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    inets,
+    crypto
+   ]},
+  {env,[]},
+  {modules, []},
+  {licenses, ["Apache 2.0"]},
+  {links, []}
+ ]}.
