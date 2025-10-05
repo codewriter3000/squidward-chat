@@ -52,22 +52,30 @@ npm run build
 cd ..
 ```
 
-## Running the Application
+## Quick Start
 
-### Start the Erlang backend
+### One-command build and run
 ```bash
+# Build frontend
+cd frontend && npm install && npm run build && cd ..
+
+# Start the backend (includes compiled frontend)
 rebar3 shell
 ```
 
-The server will start on `http://localhost:8080`
+The application will be available at `http://localhost:8080`
 
 ### Development mode (optional)
 For frontend development with hot reload:
 ```bash
+# Terminal 1: Start backend
+rebar3 shell
+
+# Terminal 2: Start frontend dev server
 cd frontend
 npm run dev
 ```
-This will start Vite dev server on `http://localhost:5173` with proxy to backend.
+Frontend dev server will run on `http://localhost:5173` with proxy to backend at `http://localhost:8080`
 
 ## Usage
 
@@ -93,23 +101,55 @@ This will start Vite dev server on `http://localhost:5173` with proxy to backend
 
 ## Extending with OAuth 2.0
 
-The authentication module (`squidward_chat_auth.erl`) is designed to be extensible. To add OAuth 2.0:
+The authentication system is designed with extensibility in mind. The current architecture supports easy integration of OAuth 2.0 providers:
 
-1. Add OAuth library dependency to `rebar.config`
-2. Extend `squidward_chat_auth` module with OAuth provider functions
-3. Add new HTTP handlers for OAuth callbacks
-4. Update frontend Auth component to include OAuth buttons
+### Current Architecture
+- `squidward_chat_auth` module manages all authentication
+- Token-based system with Bearer authentication
+- Stateless JWT-ready token generation
+- Separate authentication from authorization
 
-Example structure:
+### Adding OAuth 2.0 Support
+
+**1. Add OAuth library to `rebar.config`:**
 ```erlang
-% In squidward_chat_auth.erl
+{deps, [
+    {oauth2, "..."}  % or other OAuth library
+]}.
+```
+
+**2. Extend `squidward_chat_auth` module:**
+```erlang
+% New function for OAuth login
 oauth_login(Provider, Code) ->
-    % Exchange code for token with OAuth provider
-    % Verify token
-    % Create or retrieve user
+    % Exchange authorization code for access token
+    AccessToken = exchange_code(Provider, Code),
+    % Fetch user info from provider
+    {ok, UserInfo} = get_user_info(Provider, AccessToken),
+    % Create or retrieve user in local system
+    Username = maps:get(<<"email">>, UserInfo),
     % Generate internal token
+    Token = generate_token(Username),
+    store_oauth_mapping(Username, Provider, AccessToken),
     {ok, Token, Username}.
 ```
+
+**3. Add OAuth HTTP handlers:**
+```erlang
+% In squidward_chat_app.erl, add routes:
+{"/api/oauth/:provider/callback", oauth_callback_handler, []},
+{"/api/oauth/:provider/login", oauth_login_handler, []}
+```
+
+**4. Update frontend for OAuth:**
+```jsx
+// In Auth.jsx component
+<button onClick={() => window.location.href = '/api/oauth/google/login'}>
+  Login with Google
+</button>
+```
+
+The modular design means OAuth can be added without changing core chat functionality.
 
 ## Project Structure
 
