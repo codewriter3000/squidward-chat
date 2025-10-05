@@ -4,29 +4,36 @@
 %% Simple JSON encoder for basic maps
 encode(Map) when is_map(Map) ->
     Pairs = maps:fold(fun(K, V, Acc) ->
-        Key = encode_string(K),
+        Key = encode_key(K),
         Value = encode_value(V),
         [io_lib:format("~s:~s", [Key, Value]) | Acc]
     end, [], Map),
     ["{", string:join(lists:reverse(Pairs), ","), "}"].
 
+encode_key(K) when is_atom(K) -> encode_string(atom_to_binary(K, utf8));
+encode_key(K) when is_binary(K) -> encode_string(K);
+encode_key(K) when is_list(K) -> encode_string(list_to_binary(K)).
+
 encode_value(V) when is_binary(V) -> encode_string(V);
-encode_value(V) when is_atom(V) -> encode_string(atom_to_binary(V, utf8));
-encode_value(V) when is_integer(V) -> integer_to_list(V);
-encode_value(V) when is_float(V) -> float_to_list(V);
 encode_value(true) -> "true";
 encode_value(false) -> "false";
 encode_value(null) -> "null";
+encode_value(V) when is_atom(V) -> encode_string(atom_to_binary(V, utf8));
+encode_value(V) when is_integer(V) -> integer_to_list(V);
+encode_value(V) when is_float(V) -> float_to_list(V);
 encode_value(V) when is_list(V) -> 
     case io_lib:printable_unicode_list(V) of
         true -> encode_string(list_to_binary(V));
-        false -> encode_string(V)
-    end.
+        false -> 
+            %% Assume it's a list of values (array)
+            Values = [encode_value(Item) || Item <- V],
+            ["[", string:join(Values, ","), "]"]
+    end;
+encode_value(V) when is_map(V) ->
+    encode(V).
 
 encode_string(Bin) when is_binary(Bin) ->
-    [$", escape_string(binary_to_list(Bin)), $"];
-encode_string(List) when is_list(List) ->
-    [$", escape_string(List), $"].
+    [$", escape_string(binary_to_list(Bin)), $"].
 
 escape_string([]) -> [];
 escape_string([$" | Rest]) -> [$\\, $" | escape_string(Rest)];
