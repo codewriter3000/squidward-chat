@@ -1,0 +1,34 @@
+# Erlang
+.eunit
+deps
+*.o
+*.beam
+*.plt
+erl_crash.dump
+ebin
+rel/example_project
+.concrete/DEV_MODE
+.rebar
+_build/
+rebar3.crashdump
+
+# Node.js / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+.DS_Store
+*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
