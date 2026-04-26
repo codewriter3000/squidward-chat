@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js';
 
-const OAUTH_BASE = import.meta.env.VITE_OAUTH_BASE_URL || 'https://squidwardchat.amicharskilabs.com';
+const OAUTH_BASE = import.meta.env.VITE_OAUTH_BASE_URL || 'https://cw3admin.amicharskilabs.com';
 const CLIENT_ID = import.meta.env.VITE_OAUTH_CLIENT_ID || 'squidward-chat';
 const REDIRECT_URI =
   import.meta.env.VITE_OAUTH_REDIRECT_URI || `${window.location.origin}/oauth/callback`;
