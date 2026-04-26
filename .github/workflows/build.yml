@@ -70,10 +70,19 @@ jobs:
     needs: [build-frontend, build-backend]
     runs-on: ubuntu-latest
     steps:
+      - name: Validate deployment token
+        run: |
+          if [ -z "${{ secrets.DEPLOY_PAT }}" ] && [ -z "${{ secrets.OAUTH_SECRET }}" ]; then
+            echo "::error::Missing deployment token secret."
+            echo "::error::Provide DEPLOY_PAT or OAUTH_SECRET."
+            echo "::error::Token must have Contents: Read and write on codewriter3000/onprem-deployment for repository_dispatch."
+            exit 1
+          fi
+
       - name: Dispatch to onprem-deployment
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.DEPLOY_PAT }}
+          github-token: ${{ secrets.DEPLOY_PAT || secrets.OAUTH_SECRET }}
           script: |
             await github.rest.repos.createDispatchEvent({
               owner: 'codewriter3000',
