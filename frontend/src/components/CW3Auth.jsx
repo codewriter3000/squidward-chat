@@ -1,9 +1,7 @@
 import { createSignal } from 'solid-js';
 
-const OAUTH_BASE = import.meta.env.VITE_OAUTH_BASE_URL || 'https://cw3admin.amicharskilabs.com';
+const OAUTH_BASE = 'https://squidwardchat.amicharskilabs.com';
 const CLIENT_ID = import.meta.env.VITE_OAUTH_CLIENT_ID || 'squidward-chat';
-const REDIRECT_URI =
-  import.meta.env.VITE_OAUTH_REDIRECT_URI || `${window.location.origin}/oauth/callback`;
 
 function CW3Auth(props) {
   const [loading, setLoading] = createSignal(false);
@@ -17,10 +15,11 @@ function CW3Auth(props) {
       .join('');
     sessionStorage.setItem('oauth_state', state);
 
+    const redirectUri = window.location.origin + '/';
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
+      redirect_uri: redirectUri,
       scope: 'openid profile email',
       state: state
     });
