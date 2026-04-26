@@ -28,11 +28,11 @@ function App() {
 
       setLoading(true);
       try {
-        const redirectUri = window.location.origin + '/';
+        const REDIRECT_URI = (import.meta.env.VITE_OAUTH_REDIRECT_URI || window.location.origin).replace(/\/$/, '');
         const response = await fetch(`${API_BASE}/api/oauth/callback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, redirect_uri: redirectUri })
+          body: JSON.stringify({ code, redirect_uri: REDIRECT_URI })
         });
         const data = await response.json();
         if (data.success) {
