@@ -1,0 +1,14 @@
+## VM arguments for squidward_chat releases.
+## Set the corresponding OS environment variables before starting the release.
+##
+## Variable       │ Default            │ Notes
+## ───────────────┼────────────────────┼────────────────────────────────────────
+## RELEASE_NODE   │ squidward_chat@127.0.0.1 │ Erlang node name
+## RELEASE_COOKIE │ (auto-generated)   │ Distribution cookie; set for stable remsh
+
+-name ${RELEASE_NODE}
+-setcookie ${RELEASE_COOKIE}
+
+## Recommended production flags
++K true
++A 8

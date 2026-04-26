@@ -9,7 +9,13 @@
     inets,
     crypto
    ]},
-  {env,[]},
+  {env,[
+    {port,                  8002},
+    {oauth_client_id,       "squidward-chat"},
+    {oauth_client_secret,   ""},
+    {cors_allowed_origins,  "*"},
+    {env,                   "prod"}
+  ]},
   {modules, []},
   {licenses, ["Apache 2.0"]},
   {links, []}

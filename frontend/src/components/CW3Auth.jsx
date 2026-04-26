@@ -1,0 +1,43 @@
+import { createSignal } from 'solid-js';
+
+const OAUTH_BASE = 'http://10.0.0.2:8001';
+const CLIENT_ID = import.meta.env.VITE_OAUTH_CLIENT_ID || 'squidward-chat';
+
+function CW3Auth(props) {
+  const [loading, setLoading] = createSignal(false);
+
+  const handleOAuth = () => {
+    setLoading(true);
+
+    // Generate a random state value for CSRF protection
+    const state = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    sessionStorage.setItem('oauth_state', state);
+
+    const redirectUri = window.location.origin + '/';
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: CLIENT_ID,
+      redirect_uri: redirectUri,
+      scope: 'openid profile email',
+      state: state
+    });
+
+    window.location.href = `${OAUTH_BASE}/oauth/authorize?${params}`;
+  };
+
+  return (
+    <div class="auth-container">
+      <div class="auth-box">
+        <h1>Squidward Chat</h1>
+
+        {props.error && <div class="error">{props.error}</div>}
+
+        <button onClick={handleOAuth} disabled={loading()}>
+          {loading() ? 'Redirecting...' : 'Login with CW3'}
+    </div>
+  );
+}
+
+export default CW3Auth;

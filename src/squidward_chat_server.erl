@@ -4,19 +4,18 @@
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--define(PORT, 8080).
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    {ok, ListenSocket} = gen_tcp:listen(?PORT, [
+    Port = application:get_env(squidward_chat, port, 8002),
+    {ok, ListenSocket} = gen_tcp:listen(Port, [
         binary,
         {packet, http_bin},
         {active, false},
         {reuseaddr, true}
     ]),
-    io:format("Server listening on port ~p~n", [?PORT]),
+    io:format("Server listening on port ~p~n", [Port]),
     spawn_link(fun() -> accept_loop(ListenSocket) end),
     {ok, #{listen_socket => ListenSocket}}.
 
@@ -65,51 +64,26 @@ receive_body(Socket, Headers) ->
             end
     end.
 
-handle_request('POST', <<"/api/register">>, _Headers, Body) ->
-    try
-        Data = squidward_chat_json:decode(Body),
-        Username = maps:get(<<"username">>, Data),
-        Password = maps:get(<<"password">>, Data),
-        case squidward_chat_auth:register_user(Username, Password) of
-            {ok, registered} ->
-                Resp = squidward_chat_json:encode(#{
-                    success => true,
-                    message => <<"User registered successfully">>
-                }),
-                http_response(200, "application/json", Resp);
-            {error, user_exists} ->
-                Resp = squidward_chat_json:encode(#{
-                    success => false,
-                    message => <<"Username already exists">>
-                }),
-                http_response(400, "application/json", Resp)
-        end
-    catch
-        _:_ ->
-            ErrResp = squidward_chat_json:encode(#{
-                success => false,
-                message => <<"Invalid request">>
-            }),
-            http_response(400, "application/json", ErrResp)
-    end;
+handle_request('OPTIONS', _Path, _Headers, _Body) ->
+    cors_preflight_response();
 
-handle_request('POST', <<"/api/login">>, _Headers, Body) ->
+handle_request('POST', <<"/api/oauth/callback">>, _Headers, Body) ->
     try
         Data = squidward_chat_json:decode(Body),
-        Username = maps:get(<<"username">>, Data),
-        Password = maps:get(<<"password">>, Data),
-        case squidward_chat_auth:login_user(Username, Password) of
-            {ok, Token, Username} ->
+        Code = maps:get(<<"code">>, Data),
+        RedirectUri = maps:get(<<"redirect_uri">>, Data),
+        case squidward_chat_auth:exchange_oauth_code(Code, RedirectUri) of
+            {ok, SessionToken, Username} ->
                 Resp = squidward_chat_json:encode(#{
                     success => true,
-                    token => Token,
+                    token => SessionToken,
                     username => Username
                 }),
                 http_response(200, "application/json", Resp);
-            {error, invalid_credentials} ->
+            {error, _Reason} ->
                 Resp = squidward_chat_json:encode(#{
                     success => false,
-                    message => <<"Invalid username or password">>
+                    message => <<"OAuth authentication failed">>
                 }),
                 http_response(401, "application/json", Resp)
         end
@@ -178,6 +152,17 @@ get_auth_token(Headers) ->
         _ -> undefined
     end.
 
+cors_preflight_response() ->
+    [
+        <<"HTTP/1.1 204 No Content\r\n">>,
+        <<"Access-Control-Allow-Origin: *\r\n">>,
+        <<"Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n">>,
+        <<"Access-Control-Allow-Headers: Authorization, Content-Type\r\n">>,
+        <<"Access-Control-Max-Age: 86400\r\n">>,
+        <<"Connection: close\r\n">>,
+        <<"\r\n">>
+    ].
+
 http_response(Code, ContentType, Body) when is_list(Body) ->
     http_response(Code, ContentType, list_to_binary(Body));
 http_response(Code, ContentType, Body) ->
@@ -187,6 +172,8 @@ http_response(Code, ContentType, Body) ->
         <<"Content-Type: ">>, ContentType, <<"\r\n">>,
         <<"Content-Length: ">>, integer_to_binary(byte_size(Body)), <<"\r\n">>,
         <<"Access-Control-Allow-Origin: *\r\n">>,
+        <<"Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n">>,
+        <<"Access-Control-Allow-Headers: Authorization, Content-Type\r\n">>,
         <<"Connection: close\r\n">>,
         <<"\r\n">>,
         Body
@@ -204,11 +191,19 @@ serve_static_file(<<"/", Path/binary>>) ->
 serve_static_file(<<"">>) ->
     serve_static_file(<<"index.html">>);
 serve_static_file(Path) ->
+    %% Strip query string so SPA routes like /?code=... serve index.html
+    CleanPath = case binary:split(Path, <<"?">>) of
+        [P | _] -> P;
+        _ -> Path
+    end,
     PrivDir = code:priv_dir(squidward_chat),
-    FilePath = filename:join([PrivDir, "static", binary_to_list(Path)]),
+    FilePath = filename:join([PrivDir, "static", binary_to_list(CleanPath)]),
+    serve_file(CleanPath, FilePath).
+
+serve_file(CleanPath, FilePath) ->
     case file:read_file(FilePath) of
         {ok, Content} ->
-            ContentType = get_content_type(Path),
+            ContentType = get_content_type(CleanPath),
             http_response(200, ContentType, Content);
         {error, _} ->
             http_response(404, "text/plain", "File Not Found")

@@ -1,0 +1,22 @@
+%% Runtime configuration for squidward_chat.
+%% All tuneable variables live here. Set the corresponding OS environment
+%% variables before starting the release; the values below are the defaults
+%% used when a variable is not present in the environment.
+%%
+%% Variable reference  │ Default        │ Notes
+%% ────────────────────┼────────────────┼──────────────────────────────────────
+%% PORT                │ 8002           │ TCP port the HTTP server listens on
+%% OAUTH_CLIENT_ID     │ squidward-chat │ Registered client ID on the IAM server
+%% OAUTH_CLIENT_SECRET │ (empty)        │ Set this in prod — must not be empty
+%% CORS_ALLOWED_ORIGINS│ *              │ Restrict in prod (e.g. http://10.0.0.1)
+%% ENV                 │ prod           │ Informational; not used by the app code
+
+[
+  {squidward_chat, [
+    {port,                  ${PORT}},
+    {oauth_client_id,       "${OAUTH_CLIENT_ID}"},
+    {oauth_client_secret,   "${OAUTH_CLIENT_SECRET}"},
+    {cors_allowed_origins,  "${CORS_ALLOWED_ORIGINS}"},
+    {env,                   "${ENV}"}
+  ]}
+].
