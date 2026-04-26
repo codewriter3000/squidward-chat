@@ -64,7 +64,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend
-          path: release/
+          path: release/*
           if-no-files-found: error
           retention-days: 1
 
