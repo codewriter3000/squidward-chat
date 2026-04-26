@@ -57,11 +57,14 @@ jobs:
       - name: Compile and release
         run: rebar3 as prod release
 
+      - name: Stage release
+        run: cp -r _build/prod/rel/squidward_chat/. release/
+
       - name: Upload backend artifact
         uses: actions/upload-artifact@v4
         with:
           name: backend
-          path: _build/prod/rel/squidward_chat/
+          path: release/
           if-no-files-found: error
           retention-days: 1
 
