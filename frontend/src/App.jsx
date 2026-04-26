@@ -3,6 +3,7 @@ import CW3Auth from './components/CW3Auth';
 import Chat from './components/Chat';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const REDIRECT_URI = (import.meta.env.VITE_OAUTH_REDIRECT_URI || window.location.origin).replace(/\/$/, '');
 
 function App() {
   const [token, setToken] = createSignal(localStorage.getItem('token') || null);
@@ -28,11 +29,10 @@ function App() {
 
       setLoading(true);
       try {
-        const redirectUri = window.location.origin + '/';
         const response = await fetch(`${API_BASE}/api/oauth/callback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, redirect_uri: redirectUri })
+          body: JSON.stringify({ code, redirect_uri: REDIRECT_URI })
         });
         const data = await response.json();
         if (data.success) {
