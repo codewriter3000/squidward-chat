@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js';
 
-const OAUTH_BASE = 'https://cw3admin.amicharskilabs.com';
+const OAUTH_BASE = 'https://squidwardchat.amicharskilabs.com';
 const CLIENT_ID = import.meta.env.VITE_OAUTH_CLIENT_ID || 'squidward-chat';
 
 function CW3Auth(props) {
