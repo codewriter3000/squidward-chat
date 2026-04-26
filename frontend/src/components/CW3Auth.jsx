@@ -36,6 +36,8 @@ function CW3Auth(props) {
 
         <button onClick={handleOAuth} disabled={loading()}>
           {loading() ? 'Redirecting...' : 'Login with CW3'}
+        </button>
+      </div>
     </div>
   );
 }
