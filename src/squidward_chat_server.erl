@@ -96,7 +96,7 @@ handle_request('POST', <<"/api/oauth/callback">>, _Headers, Body) ->
             http_response(400, "application/json", ErrResp, undefined)
     end;
 
-handle_request('GET', <<"/api/session">>, Headers, _Body) ->
+handle_request('GET', <<"/api/auth/session">>, Headers, _Body) ->
     case get_cookie_token(Headers) of
         undefined ->
             Resp = squidward_chat_json:encode(#{success => false, message => <<"Not authenticated">>}),

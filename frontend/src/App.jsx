@@ -46,7 +46,7 @@ function App() {
     } else {
       // No OAuth code — check for an existing valid iam-session cookie
       try {
-        const response = await fetch('/api/session', { credentials: 'include' });
+        const response = await fetch('/api/auth/session', { credentials: 'include' });
         if (response.ok) {
           const data = await response.json();
           if (data.success) {
