@@ -20,9 +20,7 @@ function Chat(props) {
   const fetchMessages = async () => {
     try {
       const response = await fetch('/api/messages', {
-        headers: {
-          'Authorization': `Bearer ${props.token}`
-        }
+        credentials: 'include'
       });
 
       if (response.ok) {
@@ -30,7 +28,7 @@ function Chat(props) {
         if (data.success) {
           setMessages(data.messages || []);
           setConnected(true);
-          
+
           // Auto-scroll to bottom
           setTimeout(() => {
             const messagesEl = document.querySelector('.messages');
@@ -50,7 +48,7 @@ function Chat(props) {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    
+
     if (!messageInput().trim()) {
       return;
     }
@@ -58,10 +56,8 @@ function Chat(props) {
     try {
       const response = await fetch('/api/messages/send', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${props.token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           message: messageInput()
         })

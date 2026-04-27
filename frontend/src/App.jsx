@@ -2,13 +2,10 @@ import { createSignal, onMount, Show } from 'solid-js';
 import CW3Auth from './components/CW3Auth';
 import Chat from './components/Chat';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
-
 function App() {
-  const [token, setToken] = createSignal(localStorage.getItem('token') || null);
-  const [username, setUsername] = createSignal(localStorage.getItem('username') || null);
+  const [username, setUsername] = createSignal(null);
   const [authError, setAuthError] = createSignal('');
-  const [loading, setLoading] = createSignal(false);
+  const [loading, setLoading] = createSignal(true);
 
   onMount(async () => {
     const params = new URLSearchParams(window.location.search);
@@ -23,22 +20,20 @@ function App() {
 
       if (state !== storedState) {
         setAuthError('OAuth state mismatch — possible CSRF. Please try again.');
+        setLoading(false);
         return;
       }
 
-      setLoading(true);
       try {
         const REDIRECT_URI = (import.meta.env.VITE_OAUTH_REDIRECT_URI || window.location.origin).replace(/\/$/, '');
-        const response = await fetch(`${API_BASE}/api/oauth/callback`, {
+        const response = await fetch('/api/oauth/callback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ code, redirect_uri: REDIRECT_URI })
         });
         const data = await response.json();
         if (data.success) {
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('username', data.username);
-          setToken(data.token);
           setUsername(data.username);
         } else {
           setAuthError(data.message || 'OAuth login failed. Please try again.');
@@ -48,13 +43,28 @@ function App() {
       } finally {
         setLoading(false);
       }
+    } else {
+      // No OAuth code — check for an existing valid iam-session cookie
+      try {
+        const response = await fetch('/api/session', { credentials: 'include' });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setUsername(data.username);
+          }
+        }
+      } catch (_) {
+        // No active session, show login
+      } finally {
+        setLoading(false);
+      }
     }
   });
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    setToken(null);
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+    } catch (_) {}
     setUsername(null);
   };
 
@@ -70,10 +80,10 @@ function App() {
       </Show>
       <Show when={!loading()}>
         <Show
-          when={token()}
+          when={username()}
           fallback={<CW3Auth error={authError()} />}
         >
-          <Chat token={token()} username={username()} onLogout={handleLogout} />
+          <Chat username={username()} onLogout={handleLogout} />
         </Show>
       </Show>
     </div>

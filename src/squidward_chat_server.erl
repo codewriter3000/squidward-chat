@@ -74,18 +74,18 @@ handle_request('POST', <<"/api/oauth/callback">>, _Headers, Body) ->
         RedirectUri = maps:get(<<"redirect_uri">>, Data),
         case squidward_chat_auth:exchange_oauth_code(Code, RedirectUri) of
             {ok, SessionToken, Username} ->
+                Cookie = <<"iam-session=", SessionToken/binary, "; HttpOnly; Path=/; SameSite=Strict">>,
                 Resp = squidward_chat_json:encode(#{
                     success => true,
-                    token => SessionToken,
                     username => Username
                 }),
-                http_response(200, "application/json", Resp);
+                http_response(200, "application/json", Resp, Cookie);
             {error, _Reason} ->
                 Resp = squidward_chat_json:encode(#{
                     success => false,
                     message => <<"OAuth authentication failed">>
                 }),
-                http_response(401, "application/json", Resp)
+                http_response(401, "application/json", Resp, undefined)
         end
     catch
         _:_ ->
@@ -93,14 +93,39 @@ handle_request('POST', <<"/api/oauth/callback">>, _Headers, Body) ->
                 success => false,
                 message => <<"Invalid request">>
             }),
-            http_response(400, "application/json", ErrResp)
+            http_response(400, "application/json", ErrResp, undefined)
     end;
 
+handle_request('GET', <<"/api/session">>, Headers, _Body) ->
+    case get_cookie_token(Headers) of
+        undefined ->
+            Resp = squidward_chat_json:encode(#{success => false, message => <<"Not authenticated">>}),
+            http_response(401, "application/json", Resp, undefined);
+        Token ->
+            case squidward_chat_auth:verify_token(Token) of
+                {ok, Username} ->
+                    Resp = squidward_chat_json:encode(#{success => true, username => Username}),
+                    http_response(200, "application/json", Resp, undefined);
+                {error, _} ->
+                    Resp = squidward_chat_json:encode(#{success => false, message => <<"Invalid session">>}),
+                    http_response(401, "application/json", Resp, undefined)
+            end
+    end;
+
+handle_request('POST', <<"/api/logout">>, Headers, _Body) ->
+    case get_cookie_token(Headers) of
+        undefined -> ok;
+        Token -> squidward_chat_auth:logout(Token)
+    end,
+    ClearCookie = <<"iam-session=; HttpOnly; Path=/; SameSite=Strict; Max-Age=0">>,
+    Resp = squidward_chat_json:encode(#{success => true}),
+    http_response(200, "application/json", Resp, ClearCookie);
+
 handle_request('POST', <<"/api/messages/send">>, Headers, Body) ->
-    case get_auth_token(Headers) of
+    case get_cookie_token(Headers) of
         undefined ->
             Resp = squidward_chat_json:encode(#{success => false, message => <<"Unauthorized">>}),
-            http_response(401, "application/json", Resp);
+            http_response(401, "application/json", Resp, undefined);
         Token ->
             case squidward_chat_auth:verify_token(Token) of
                 {ok, Username} ->
@@ -110,32 +135,32 @@ handle_request('POST', <<"/api/messages/send">>, Headers, Body) ->
                         Timestamp = erlang:system_time(millisecond),
                         squidward_chat_room:broadcast_message(Username, Message, Timestamp),
                         Resp = squidward_chat_json:encode(#{success => true}),
-                        http_response(200, "application/json", Resp)
+                        http_response(200, "application/json", Resp, undefined)
                     catch
                         _:_ ->
                             ErrResp = squidward_chat_json:encode(#{success => false, message => <<"Invalid request">>}),
-                            http_response(400, "application/json", ErrResp)
+                            http_response(400, "application/json", ErrResp, undefined)
                     end;
                 {error, _} ->
-                    Resp = squidward_chat_json:encode(#{success => false, message => <<"Invalid token">>}),
-                    http_response(401, "application/json", Resp)
+                    Resp = squidward_chat_json:encode(#{success => false, message => <<"Invalid session">>}),
+                    http_response(401, "application/json", Resp, undefined)
             end
     end;
 
 handle_request('GET', <<"/api/messages">>, Headers, _Body) ->
-    case get_auth_token(Headers) of
+    case get_cookie_token(Headers) of
         undefined ->
             Resp = squidward_chat_json:encode(#{success => false, message => <<"Unauthorized">>}),
-            http_response(401, "application/json", Resp);
+            http_response(401, "application/json", Resp, undefined);
         Token ->
             case squidward_chat_auth:verify_token(Token) of
                 {ok, _Username} ->
                     Messages = squidward_chat_room:get_recent_messages(),
                     Resp = squidward_chat_json:encode(#{success => true, messages => Messages}),
-                    http_response(200, "application/json", Resp);
+                    http_response(200, "application/json", Resp, undefined);
                 {error, _} ->
-                    Resp = squidward_chat_json:encode(#{success => false, message => <<"Invalid token">>}),
-                    http_response(401, "application/json", Resp)
+                    Resp = squidward_chat_json:encode(#{success => false, message => <<"Invalid session">>}),
+                    http_response(401, "application/json", Resp, undefined)
             end
     end;
 
@@ -145,11 +170,24 @@ handle_request('GET', Path, _Headers, _Body) ->
 handle_request(_, _, _, _) ->
     http_response(404, "text/plain", "Not Found").
 
-get_auth_token(Headers) ->
-    case proplists:get_value('Authorization', Headers) of
+get_cookie_token(Headers) ->
+    case proplists:get_value('Cookie', Headers) of
         undefined -> undefined;
-        <<"Bearer ", Token/binary>> -> Token;
-        _ -> undefined
+        CookieHeader ->
+            Pairs = binary:split(CookieHeader, <<";">>, [global]),
+            find_cookie(Pairs, <<"iam-session">>)
+    end.
+
+find_cookie([], _Name) -> undefined;
+find_cookie([Pair | Rest], Name) ->
+    Stripped = string:trim(binary_to_list(Pair)),
+    case string:split(Stripped, "=", leading) of
+        [K, V] ->
+            case list_to_binary(string:trim(K)) of
+                Name -> list_to_binary(string:trim(V));
+                _    -> find_cookie(Rest, Name)
+            end;
+        _ -> find_cookie(Rest, Name)
     end.
 
 cors_preflight_response() ->
@@ -157,23 +195,33 @@ cors_preflight_response() ->
         <<"HTTP/1.1 204 No Content\r\n">>,
         <<"Access-Control-Allow-Origin: *\r\n">>,
         <<"Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n">>,
-        <<"Access-Control-Allow-Headers: Authorization, Content-Type\r\n">>,
+        <<"Access-Control-Allow-Headers: Authorization, Content-Type, Cookie\r\n">>,
         <<"Access-Control-Max-Age: 86400\r\n">>,
         <<"Connection: close\r\n">>,
         <<"\r\n">>
     ].
 
 http_response(Code, ContentType, Body) when is_list(Body) ->
-    http_response(Code, ContentType, list_to_binary(Body));
+    http_response(Code, ContentType, list_to_binary(Body), undefined);
 http_response(Code, ContentType, Body) ->
+    http_response(Code, ContentType, Body, undefined).
+
+http_response(Code, ContentType, Body, Cookie) when is_list(Body) ->
+    http_response(Code, ContentType, list_to_binary(Body), Cookie);
+http_response(Code, ContentType, Body, Cookie) ->
     StatusText = http_status_text(Code),
+    CookieLine = case Cookie of
+        undefined -> [];
+        _         -> [<<"Set-Cookie: ">>, Cookie, <<"\r\n">>]
+    end,
     [
         <<"HTTP/1.1 ">>, integer_to_binary(Code), <<" ">>, StatusText, <<"\r\n">>,
         <<"Content-Type: ">>, ContentType, <<"\r\n">>,
         <<"Content-Length: ">>, integer_to_binary(byte_size(Body)), <<"\r\n">>,
+        CookieLine,
         <<"Access-Control-Allow-Origin: *\r\n">>,
         <<"Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n">>,
-        <<"Access-Control-Allow-Headers: Authorization, Content-Type\r\n">>,
+        <<"Access-Control-Allow-Headers: Authorization, Content-Type, Cookie\r\n">>,
         <<"Connection: close\r\n">>,
         <<"\r\n">>,
         Body
