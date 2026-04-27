@@ -46,7 +46,8 @@ function App() {
     } else {
       // No OAuth code — check for an existing valid iam-session cookie
       try {
-        const response = await fetch('/api/auth/session', { credentials: 'include' });
+        const OAUTH_BASE = import.meta.env.VITE_OAUTH_BASE_URL || 'https://cw3admin.amicharskilabs.com';
+        const response = await fetch(`${OAUTH_BASE}/api/auth/session`, { credentials: 'include' });
         if (response.ok) {
           const data = await response.json();
           if (data.success) {

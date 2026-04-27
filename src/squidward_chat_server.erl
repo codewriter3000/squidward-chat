@@ -96,22 +96,6 @@ handle_request('POST', <<"/api/oauth/callback">>, _Headers, Body) ->
             http_response(400, "application/json", ErrResp, undefined)
     end;
 
-handle_request('GET', <<"/api/auth/session">>, Headers, _Body) ->
-    case get_cookie_token(Headers) of
-        undefined ->
-            Resp = squidward_chat_json:encode(#{success => false, message => <<"Not authenticated">>}),
-            http_response(401, "application/json", Resp, undefined);
-        Token ->
-            case squidward_chat_auth:verify_token(Token) of
-                {ok, Username} ->
-                    Resp = squidward_chat_json:encode(#{success => true, username => Username}),
-                    http_response(200, "application/json", Resp, undefined);
-                {error, _} ->
-                    Resp = squidward_chat_json:encode(#{success => false, message => <<"Invalid session">>}),
-                    http_response(401, "application/json", Resp, undefined)
-            end
-    end;
-
 handle_request('POST', <<"/api/logout">>, Headers, _Body) ->
     case get_cookie_token(Headers) of
         undefined -> ok;
