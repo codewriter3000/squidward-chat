@@ -50,8 +50,9 @@ function App() {
         const response = await fetch(`${OAUTH_BASE}/api/auth/session`, { credentials: 'include' });
         if (response.ok) {
           const data = await response.json();
-          if (data.success) {
-            setUsername(data.username);
+          const user = data.username || data.preferred_username || data.sub;
+          if (user) {
+            setUsername(user);
           }
         }
       } catch (_) {
